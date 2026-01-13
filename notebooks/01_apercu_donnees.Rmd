@@ -1,0 +1,164 @@
+
+
+```{r}
+library(naniar)
+library(dplyr)
+```
+
+# Offre culturelle 
+
+```{r jeu de donnée}
+offre_culturelle <- read.csv("../data/raw/offre_culturelle.csv",sep=";") %>% mutate(across(everything(), ~ ifelse(trimws(.) %in% c("", "unknown", "N/A", "missing", "NULL"," ","   "), NA,.)))
+
+head(offre_culturelle)
+```
+
+# Découverte des jeux de données
+```{r noms des colonnes}
+colnames(offre_culturelle)
+```
+
+```{r Type d'équipement ou de lieu existants}
+unique(offre_culturelle$"Type.équipement.ou.lieu")
+```
+
+```{r Toute les régions dans le jeu de donnée}
+unique(offre_culturelle$Région)
+```
+
+```{r}
+#summary(offre_culturelle)
+```
+
+```{r Représentation graphique des données manquantes}
+gg_miss_var(offre_culturelle)
+```
+
+# Les librairies 
+
+```{r Jeu de donnée}
+librairie <- read.csv("../data/raw/librairie.csv",sep=";") %>% mutate(across(everything(), ~ ifelse(trimws(.) %in% c("", "unknown", "N/A", "missing", "NULL"," ","   "), NA,.)))
+
+head(librairie)
+```
+## Inspection du jeu de donnée
+```{r noms des colonnes}
+colnames(librairie)
+```
+
+```{r}
+#unique(librairie$Commune)
+head(librairie$Commune)
+```
+Nous remarquons que la colonne se constitue du code postal et du nom de la commune en majuscule.
+
+```{r}
+head(librairie$code_insee)
+```
+Les codes INSEE suivent une logique définie par des normes internes à l'organisme, les 2 premiers chiffres font référence à la région (sauf pour les régions d'outre-mers qui on 3 chiffres ex:971 + la corse : 2A,2B). Ceci va nous causer problèle donc nous préférons garder le code postal pour la suite.
+
+
+## Stat descriptive
+```{r}
+summary(librairie)
+```
+
+## Données manquantes
+
+### Visualisation par colonne
+```{r}
+gg_miss_var(librairie)
+```
+
+```{r}
+vis_miss(librairie) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+```
+La colonne Complement a beaucoup trop de données manquantes, mais nous n'en avons pas besoin donc ce n'est pas déterminant. Je rappelle qu'ici nous utilisons ce jeu de donnée pour compléter le précédent pour dans le but de cartographier les bibliotèques et les libraries en outre-mer.
+
+Nous garderons 3 colonnes : Commune, latitude, longitude
+
+### Focus sur les données manquantes de latitude et longitude 
+```{r}
+idx <- which(is.na(librairie$latitude) | librairie$latitude == 0 |
+             is.na(librairie$longitude) | librairie$longitude == 0)
+
+librairie[idx, ]
+```
+Il n'y a qu'une librarie dans une région que nous étudions : MONSIEUR GERARD LAGOURGUE	97434 SAINT PAUL (à la Réunion). Sa localisation trouvée en ligne est (55.228583,-21.051372). Il faudra compléter.
+
+# Les bibliotèques publiques 
+
+```{r}
+bibliotheques_publiques <- read.csv("../data/raw/bibliotheques-publiques.csv",sep=";") %>%
+  mutate(across(everything(), ~ ifelse(trimws(.) %in% c("", "unknown", "N/A", "missing", "NULL"," ","   "), NA,.)))
+head(bibliotheques_publiques)
+```
+```{r}
+unique(bibliotheques_publiques$Région)
+```
+
+```{r}
+colnames(bibliotheques_publiques)
+```
+
+```{r}
+gg_miss_var(bibliotheques_publiques)
+```
+
+```{r}
+info_na <- function(data) {
+  cat("--- Nombre de bibliothèques ---\n")
+  cat(nrow(data), "\n\n")
+  
+  na_per_column <- colSums(is.na(data))
+  na_pct_per_column <- colSums(is.na(data)) * 100 / nrow(data)
+  
+  cat("--- Nombre de NA par colonne ---\n")
+  print(head(sort(na_per_column, decreasing = TRUE)))
+  
+  cat("\n--- Pourcentage de NA par colonne (%) ---\n")
+  print(head(sort(na_pct_per_column, decreasing = TRUE)))
+}
+```
+
+```{r}
+info_na(bibliotheques_publiques[bibliotheques_publiques$Région == "Guadeloupe", ])
+```
+
+```{r}
+info_na(bibliotheques_publiques[bibliotheques_publiques$Région == "La Réunion", ])
+```
+
+```{r}
+info_na(bibliotheques_publiques[bibliotheques_publiques$Région == "Centre-Val de Loire", ])
+```
+
+```{r}
+regions <- c("La Réunion", "Guadeloupe", "Centre-Val de Loire")
+
+# Filtrer les lignes
+coords_na <- bibliotheques_publiques[
+  bibliotheques_publiques$Région %in% regions &
+  (is.na(bibliotheques_publiques$Population.commune) | 
+   bibliotheques_publiques$Population.commune == 0),
+]
+
+# Obtenir les indices
+idx <- which(bibliotheques_publiques$Région %in% regions &
+              (is.na(bibliotheques_publiques$Population.commune) | 
+               bibliotheques_publiques$Population.commune == 0))
+
+# Afficher les lignes
+bibliotheques_publiques[idx, ] %>% 
+  select(nom_de_l_etablissement,Région,Ville)
+```
+Les communes de la région Centre-Val de Loire ont pour populations : Blois 41018 habitants, Tours 41018 habitants, Bourges 65723 habitants, Mainvilliers 10950 habitants, Châteauroux 44560 habitants, Arrabloy 500 habitants et Orléans 119065 habitants. En guadeloupe, à Basse-Terre il y a 9973 habitants.
+Enfini, à la Réunion à Saint-Denis , il y a 156282 habitants.
+
+Nom de ville manquant
+```{r}
+bibliotheques_publiques %>%
+  filter(Ville=="0")
+```
+

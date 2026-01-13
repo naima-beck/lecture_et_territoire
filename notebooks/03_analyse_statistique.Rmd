@@ -1,0 +1,137 @@
+```{r}
+install.packages("FSA")
+```
+
+
+```{r}
+library(rstatix)
+library(car)  # pour LeveneTest
+
+# Les entrées par habitant par commune pour chaque région
+depenses_guadeloupe_commune <- depenses_guadeloupe_commune %>%
+  mutate(Région = "Guadeloupe",
+         Entrees_par_habitant = total_entrees_commune / Population.commune)
+
+depenses_reunion_commune <- depenses_reunion_commune %>%
+  mutate(Région = "Réunion",
+         Entrees_par_habitant = total_entrees_commune / Population.commune)
+
+depenses_centre_val_commune <- depenses_centre_val_commune %>%
+  mutate(Région = "Centre-Val-de-Loire",
+         Entrees_par_habitant = total_entrees_commune / Population.commune)
+
+entrees_communes <- bind_rows(
+  depenses_guadeloupe_commune,
+  depenses_reunion_commune,
+  depenses_centre_val_commune
+)
+```
+
+
+```{r}
+# Vérifier la normalité par région (Shapiro-Wilk)
+normality_test <- entrees_communes %>%
+  group_by(Région) %>%
+  summarise(shapiro_p = shapiro.test(Entrees_par_habitant)$p.value)
+
+print(normality_test)
+```
+Puisque toutes les p-values < 0.05, les données par commune ne sont pas normales. Donc ANOVA paramétrique n’est pas fiable ici.
+Faisons le test Krustal-Wallis, puique nous avons des distributions non normales, des variances différentes, et des observations indépendantes.Il teste si les médianes par région diffèrent, et le test post-hoc (Dunn) permet de savoir quels groupes diffèrent.
+
+
+```{r}
+# Kruskal-Wallis
+kruskal_result <- kruskal.test(Entrees_par_habitant ~ Région, data = entrees_communes)
+kruskal_result
+```
+p-value = 4.6e-11 (très faible) c'est très significatif; ceci indique que la distribution des entrées par habitant diffère entre au moins deux régions. Rejet de H0
+
+```{r}
+# post-hoc si significatif (pour voir quelles régions diffèrent)
+
+library(FSA)
+
+dunnTest(Entrees_par_habitant ~ Région, data = entrees_communes, method="bonferroni")
+```
+Centre-Val-de-Loire vs Guadeloupe : entrée par habitant beaucoup plus élevée ou plus faible selon la direction.
+
+Guadeloupe vs Réunion : différence significative, mais moins marquée.
+
+Centre-Val-de-Loire vs Réunion : pas significatif.
+
+```{r}
+library(ggpubr)  # pour stat_pvalue_manual
+
+# Préparer les comparaisons significatives à annoter
+comparisons <- data.frame(
+  group1 = c("Centre-Val-de-Loire", "Guadeloupe"),
+  group2 = c("Guadeloupe", "Réunion"),
+  p.adj = c(2.956695e-11, 9.569421e-04),
+  y.position = c(30, 28)  # Ajuste les valeurs selon la hauteur de ton graphique
+)
+
+# Créer le boxplot
+p_box <- ggplot(entrees_communes, aes(x = Région, y = Entrees_par_habitant, fill = Région)) +
+  geom_boxplot(outlier.colour = "red", outlier.shape = 16) +
+  labs(
+    title = "Distribution des entrées par habitant par région",
+    x = "Région",
+    y = "Entrées par habitant"
+  ) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Ajouter les p-values significatives
+p_box <- p_box + 
+  stat_pvalue_manual(
+    comparisons,
+    label = "p.adj",
+    tip.length = 0.02,
+    hide.ns = TRUE
+  )
+
+p_box
+```
+
+wtffffffffffffff
+
+```{r}
+colnames(bibliotheques_regions)
+```
+
+Ressources : nombre_de_livres 
+
+nombre_de_prets, nombre_d_emprunteurs
+```{r}
+library(dplyr)
+
+# Résumé par région
+ressources_region <- bibliotheques_regions %>%
+  group_by(Région) %>%
+  summarise(
+    nb_livres_moy = mean(nombre_de_livres, na.rm = TRUE),
+    nb_prets_moy = mean(nombre_de_prets, na.rm = TRUE),
+    nb_emprunteurs_moy = mean(nombre_d_emprunteurs, na.rm = TRUE)
+  ) %>%
+  ungroup()
+```
+
+#bizzare? 
+```{r}
+ggplot(ressources_region, aes(x = Région, y = nb_livres_moy, fill = Région)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Nombre moyen de livres par bibliothèque et par région",
+    x = "Région",
+    y = "Nombre moyen de livres"
+  ) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+
+
+
+

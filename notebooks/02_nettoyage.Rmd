@@ -1,0 +1,346 @@
+
+# Librairie 
+```{r}
+library(dplyr)
+library(readr)
+library(tidyr)
+```
+
+# 1. Offre culturelle 
+
+```{r}
+offre_culturelle <- read.csv("../data/raw/offre_culturelle.csv",sep=";") %>% mutate(across(everything(), ~ ifelse(trimws(.) %in% c("", "unknown", "N/A", "missing", "NULL"," ","   "), NA,.)))
+
+offre_culturelle <- offre_culturelle %>%
+  separate(coordonnees_geo, into = c("latitude", "longitude"), sep = ",") %>%
+  mutate(
+    latitude = as.numeric(latitude),
+    longitude = as.numeric(longitude)
+  )
+
+head(offre_culturelle)
+```
+
+## Guadeloupe
+
+```{r}
+dataset_region <- function(nom_region) {
+  offre_culturelle %>%
+    select("Nom", "latitude", "longitude", "Région", "Type.équipement.ou.lieu") %>%
+    filter(Région == nom_region) %>%
+    select(-"Région")
+}
+```
+
+
+```{r}
+offre_culturelle_guadeloupe <- dataset_region("Guadeloupe")
+head(offre_culturelle_guadeloupe)
+```
+
+```{r}
+unique(offre_culturelle_guadeloupe$Type.équipement.ou.lieu)
+```
+
+```{r}
+dataset_equipement <- function(data,nom_equipement) {
+  data %>%
+    filter(Type.équipement.ou.lieu==nom_equipement) %>%
+    select(longitude,latitude)
+}
+```
+
+
+```{r}
+offre_biblioteque_guadeloupe <- dataset_equipement(offre_culturelle_guadeloupe,"Bibliothèque")
+
+head(offre_biblioteque_guadeloupe)
+```
+
+## Réunion 
+
+```{r}
+offre_culturelle_reunion <- dataset_region("La Réunion")
+head(offre_culturelle_reunion)
+```
+```{r}
+sum(offre_culturelle_reunion$Type.équipement.ou.lieu=="Librairie")
+```
+```{r}
+offre_biblioteque_reunion <- dataset_equipement(offre_culturelle_reunion,"Bibliothèque")
+
+head(offre_biblioteque_reunion)
+```
+
+## Centre vale de loire
+```{r}
+offre_culturelle_cvl <- dataset_region("Centre-Val de Loire")
+head(offre_culturelle_cvl)
+```
+```{r}
+sum(offre_culturelle_cvl$Type.équipement.ou.lieu=="Librairie")
+```
+
+```{r}
+offre_biblioteque_cvl <- dataset_equipement(offre_culturelle_cvl,"Bibliothèque")
+
+head(offre_biblioteque_cvl)
+```
+```{r}
+nrow(offre_biblioteque_guadeloupe)
+nrow(offre_biblioteque_reunion)
+nrow(offre_biblioteque_cvl)
+```
+
+
+
+# Exportation
+
+```{r}
+write.csv(offre_biblioteque_guadeloupe, "../data/processed/cartographie/bibliotheque_guadeloupe.csv", row.names = FALSE)
+
+write.csv(offre_biblioteque_reunion, "../data/processed/cartographie/bibliotheque_reunion.csv", row.names = FALSE)
+
+write.csv(offre_biblioteque_cvl, "../data/processed/cartographie/bibliotheque_centre_val_de_loire.csv", row.names = FALSE)
+```
+
+
+# 2. Les librairies
+```{r}
+librairie <- read.csv("../data/raw/librairie.csv",sep=";") %>% 
+  select(Designation,Commune,latitude,longitude) %>%
+  mutate(across(everything(), ~ ifelse(trimws(.) %in% c("", "unknown", "N/A", "missing", "NULL"," ","   "), NA,.))) 
+
+head(librairie)
+```
+### Correction de coordonnée spécifique : bibliothèque MONSIEUR GERARD LAGOURGUE 
+```{r}
+#librairie[3374, ]
+librairie$latitude[3374]  <- -21.051372
+librairie$longitude[3374] <-  55.228583
+librairie[3374, ]
+```
+
+
+## Création des sous jeux de données par régions
+
+### Extraction du code postal
+```{r}
+librairie$code_postal <- stringr::str_extract(librairie$Commune, "\\b\\d{5}\\b")
+head(librairie)
+```
+
+### Guadeloupe
+
+```{r}
+librairie$latitude  <- as.numeric(as.character(librairie$latitude))
+librairie$longitude <- as.numeric(as.character(librairie$longitude))
+```
+
+```{r}
+lib_guadeloupe <- librairie[grepl("^971", librairie$code_postal), ] 
+head(lib_guadeloupe)
+```
+
+```{r}
+idx <- which(lib_guadeloupe$latitude < 15 |
+             lib_guadeloupe$latitude > 17 |
+             lib_guadeloupe$longitude < -62 |
+             lib_guadeloupe$longitude > -60)
+
+lib_guadeloupe[idx, ]
+```
+Les librairies à Saint Bathelemy et à Saint Martin sont comprises dans le dataset sur la guadeloupe, je les retire donc. C'est tout à fait normal puisque les anciennes dépendances de la Guadeloupe incluaient Saint-Barthélemy et Saint-Martin. Jusqu'en 2007, ces îles étaient administrativement rattachées à la Guadeloupe, d’où le même code postal “971”.
+
+```{r}
+lib_guadeloupe <- lib_guadeloupe %>%
+  filter(!code_postal %in% c("97133", "97150"))
+```
+
+```{r}
+lib_guadeloupe <- lib_guadeloupe %>%
+  select(longitude,latitude)
+```
+
+### La Réunion
+
+```{r}
+lib_reunion <- librairie[grepl("^974", librairie$code_postal), ] 
+head(lib_reunion)
+```
+
+```{r}
+idx <- which(lib_reunion$latitude < -22 | 
+             lib_reunion$latitude > -20 |
+             lib_reunion$longitude < 55 |
+             lib_reunion$longitude > 56)
+lib_reunion[idx, ]
+```
+Super 
+
+```{r}
+lib_reunion <- lib_reunion %>%
+  select(longitude,latitude)
+```
+
+
+### Centre-Val-de-Loire
+```{r}
+deps_cvl <- c("18", "28", "36", "37", "41", "45")
+lib_cvl <- librairie[substr(librairie$code_postal, 1, 2) %in% deps_cvl, ] 
+head(lib_cvl)
+```
+
+```{r}
+idx <- which(lib_cvl$latitude < 46 | lib_cvl$latitude > 49 |
+                 lib_cvl$longitude < -1 | lib_cvl$longitude > 3)
+
+lib_cvl[idx,]
+```
+Super, pas de soucis ici non plus.
+
+```{r}
+lib_cvl <- lib_cvl %>%
+  select(longitude,latitude)
+```
+
+
+Pour les départements d'outre-mer il y a plus de données dans le jeu de donnée dédié aux librairies. Et il y a plus de données de librairies dans celui sur les offres culturelles pour le centre val de loire. 
+
+
+```{r}
+offre_librairie_guadeloupe <- dataset_equipement(offre_culturelle_guadeloupe,"Librairie") 
+
+offre_librairie_reunion <- dataset_equipement(offre_culturelle_reunion,"Librairie") 
+
+offre_librairie_cvl <- dataset_equipement(offre_culturelle_cvl,"Librairie") 
+
+#head(offre_librairie_cvl)
+```
+
+## Choix des data set de librarie que l'on garde pour la carto 
+```{r}
+nrow(offre_librairie_guadeloupe)
+nrow(offre_librairie_reunion)
+nrow(offre_librairie_cvl)
+
+nrow(lib_guadeloupe)
+nrow(lib_reunion)
+nrow(lib_cvl)
+```
+```{r}
+intersection_librairie <- function(data1,data2) {
+  bind_rows(data1,data2) %>% 
+  distinct(longitude, latitude, .keep_all = TRUE) 
+}
+
+lib_total_guadeloupe <- intersection_librairie(offre_librairie_guadeloupe, lib_guadeloupe)
+lib_total_reunion <- intersection_librairie(offre_librairie_reunion, lib_reunion)
+lib_total_cvl <- intersection_librairie(offre_librairie_cvl, lib_cvl)
+
+nrow(lib_total_guadeloupe)
+nrow(lib_total_reunion)
+nrow(lib_total_cvl)
+
+```
+Pas convaincu ne gardons par l'intersection mais juste le chiffre le plus grand dans les jeux de donnée.
+
+## Exportation
+```{r}
+write.csv(lib_guadeloupe, "../data/processed/cartographie/librairie_guadeloupe.csv", row.names = FALSE)
+
+write.csv(lib_reunion, "../data/processed/cartographie/librairie_reunion.csv", row.names = FALSE)
+
+write.csv(offre_librairie_cvl, "../data/processed/cartographie/librairie_centre_val_de_loire.csv", row.names = FALSE)
+```
+
+
+# 3. Les bibliothèques 
+
+```{r}
+bibliotheques_publiques <- read.csv("../data/raw/bibliotheques-publiques.csv",sep=";") %>%
+  select(-Téléphone,-montant_acquisitions_pat,-nombre_de_documents_patrimoniaux, -nombre_acquisitions_pat,-temps_de_travail_des_benevoles,-etp_salaries_non_titulaires,-Nombre.de.bénévoles,-Cedex,-Complément,-libelle_2,-site_internet_accessible) %>%
+  mutate(across(everything(), ~ ifelse(trimws(.) %in% c("", "unknown", "N/A", "missing", "NULL"," ","   "), NA,.)))
+head(bibliotheques_publiques)
+```
+### Gestion des valeurs manquantes
+```{r}
+# Centre val de loire
+bibliotheques_publiques$Population.commune[1203]=41018 # Blois
+
+bibliotheques_publiques$Population.commune[6446]=41018 # Tours
+
+bibliotheques_publiques$Population.commune[15560]=65723 # Bourges
+
+bibliotheques_publiques$Population.commune[7893]= 10950 #Mainvilliers
+
+bibliotheques_publiques$Population.commune[14507]=44560 # Châteauroux
+
+bibliotheques_publiques$Population.commune[14227]=500 # Arrabloy
+bibliotheques_publiques$Population.commune[7895]=119065 # Orléans
+
+# Guadeloupe 
+bibliotheques_publiques$Population.commune[5]=9973 # Basse-Terre
+
+# Réunion 
+bibliotheques_publiques$Population.commune[8042]=156282 #Saint-Denis
+```
+
+Nom de ville manquant
+```{r}
+bibliotheques_publiques$Ville[bibliotheques_publiques$Ville == 0] <- "Issigeac"
+```
+
+```{r}
+dataset_biblioteque <- function(nom_region) {
+  bibliotheques_publiques %>%
+  filter(Région==nom_region) %>%
+  select(-Région,-code_region)
+}
+```
+
+```{r}
+bibli_pub_guadeloupe<- dataset_biblioteque("Guadeloupe")
+head(bibli_pub_guadeloupe)
+```
+
+```{r}
+bibli_pub_reunion<- dataset_biblioteque("La Réunion")
+head(bibli_pub_reunion)
+```
+
+```{r}
+bibli_pub_cvl<- dataset_biblioteque("Centre-Val de Loire")
+head(bibli_pub_cvl)
+```
+
+# Mettre une moyenne pour les données manquantes
+```{r}
+remplacer_na_par_moyenne <- function(df, colonnes) {
+  for (col in colonnes) {
+    moy <- mean(df[[col]], na.rm = TRUE)
+    df[[col]][is.na(df[[col]])] <- moy
+  }
+  return(df)
+}
+
+colonnes <- c("depenses_action_culturelle", "depenses_documentaires","nombre_de_livres", "nombre_de_prets", "nombre_d_emprunteurs","nombre_d_entrees")
+
+bibli_pub_guadeloupe <- remplacer_na_par_moyenne(bibli_pub_guadeloupe, colonnes)
+bibli_pub_reunion <- remplacer_na_par_moyenne(bibli_pub_reunion, colonnes)
+bibli_pub_cvl <- remplacer_na_par_moyenne(bibli_pub_cvl, colonnes)
+bibliotheques_publiques <- remplacer_na_par_moyenne(bibliotheques_publiques, colonnes)
+```
+
+
+## Exportation
+```{r}
+write.csv(bibli_pub_guadeloupe, "../data/processed/visualisation/bibliotheques_publiques_guadeloupe.csv", row.names = FALSE)
+
+write.csv(bibli_pub_reunion, "../data/processed/visualisation/bibliotheques_publiques_reunion.csv", row.names = FALSE)
+
+write.csv(bibli_pub_cvl, "../data/processed/visualisation/bibliotheques_publiques_centre_val_de_loire.csv", row.names = FALSE)
+
+write.csv(bibliotheques_publiques, "../data/processed/visualisation/bibliotheques_publiques.csv", row.names = FALSE)
+```
+

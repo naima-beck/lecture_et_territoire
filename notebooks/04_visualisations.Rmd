@@ -1,0 +1,215 @@
+
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+# Importation du jeu de donnée nettoyé
+```{r}
+bibli_pub_guadeloupe <- read.csv("../data/processed/visualisation/bibliotheques_publiques_guadeloupe.csv")
+bibli_pub_reunion <- read.csv("../data/processed/visualisation/bibliotheques_publiques_reunion.csv")
+bibli_pub_cvl <- read.csv("../data/processed/visualisation/bibliotheques_publiques_centre_val_de_loire.csv")
+bibliotheques_publiques <- read.csv("../data/processed/visualisation/bibliotheques_publiques.csv")
+```
+
+```{r}
+bibli_pub_guadeloupe$Région <- "Guadeloupe"
+bibli_pub_reunion$Région <- "Réunion"
+bibli_pub_cvl$Région <- "Centre-Val-de-Loire"
+
+bibliotheques_regions <- bind_rows(
+  bibli_pub_guadeloupe,
+  bibli_pub_reunion,
+  bibli_pub_cvl
+)
+```
+
+
+# top
+```{r}
+bibliotheques_publiques %>%
+  count(Ville, Région, sort = TRUE) %>%
+  slice(1:20) %>%
+  ggplot(aes(x = reorder(Ville, n), y = n, fill = Région)) +
+  geom_col() +
+  coord_flip() +
+  scale_y_continuous(breaks = scales::pretty_breaks(), labels = scales::label_number(accuracy = 1)) +
+  theme_minimal() +
+  labs(title = "Les 20 villes avec le plus de bibliothèques en France", x="Nombre de bibliotèques", y="Villes")
+```
+
+```{r}
+bibliotheques_publiques %>%
+  count(Département, Région, sort = TRUE) %>%
+  slice(1:20) %>%
+  ggplot(aes(x = reorder(Département, n), y = n, fill=Région)) +
+  geom_col() +
+  coord_flip() +
+  scale_y_continuous(breaks = scales::pretty_breaks(), labels = scales::label_number(accuracy = 1)) +
+  theme_minimal() +
+  labs(title = "Les 20 départements avec le plus de bibliothèques en France", x="Nombre de bibliotèques", y="Villes")
+```
+
+# Les 20 villes avec le plus de bibliothèques parmis nos 3 régions
+
+```{r}
+bibliotheques_regions <- bibliotheques_publiques %>%
+  filter(Région == "Centre-Val de Loire" |
+         Région == "La Réunion" |
+         Région == "Guadeloupe")
+```
+
+```{r}
+bibliotheques_regions %>%
+  count(Ville, Région, sort = TRUE) %>%
+  slice(1:20) %>%
+  ggplot(aes(x = reorder(Ville, n), y = n, fill = Région)) +
+  geom_col() +
+  coord_flip() +
+  scale_y_continuous(breaks = scales::pretty_breaks(), labels = scales::label_number(accuracy = 1)) +
+  theme_minimal() +
+  labs(title = "Les 20 villes avec le plus de bibliothèques parmis nos 3 régions", x="Nombre de bibliotèques", y="Villes")
+```
+
+
+# Dépenses documentaires et d’action culturelle des bibliothèques rapportées au nombre d’habitants
+
+Dataset avec les dépenses totales par commune par région
+```{r}
+creer_intermediaire <- function(df) {
+  df %>%
+    mutate(
+      depenses_totales_commune = depenses_action_culturelle + depenses_documentaires
+    ) %>%
+    group_by(Ville) %>%
+    summarize(
+      depenses_totales_commune = sum(depenses_totales_commune, na.rm = TRUE),
+      Population.commune = suppressWarnings(first(Population.commune[!is.na(Population.commune)]))
+    ) %>%
+    ungroup() %>%
+    mutate(
+      Population.commune = ifelse(is.na(Population.commune),
+                                  mean(Population.commune, na.rm = TRUE),  # remplace NA par moyenne France
+                                  Population.commune)
+    )
+}
+
+depenses_guadeloupe_commune <- creer_intermediaire(bibli_pub_guadeloupe)
+depenses_reunion_commune <- creer_intermediaire(bibli_pub_reunion)
+depenses_centre_val_commune <- creer_intermediaire(bibli_pub_cvl)
+depenses_france_commune <- creer_intermediaire(bibliotheques_publiques)
+
+head(depenses_france_commune)
+```
+
+Calcul du ratio de dépense des bibliothèques de la région rapporté au nombre d'habitants de la région
+```{r}
+calcul_depenses <- function(df_commune) {
+  total_depenses <- sum(df_commune$depenses_totales_commune, na.rm = TRUE)
+  total_population <- sum(df_commune$Population.commune, na.rm = TRUE)
+  (total_depenses / total_population) * 1
+}
+
+depenses_guadeloupe <- calcul_depenses(depenses_guadeloupe_commune)
+depenses_reunion <- calcul_depenses(depenses_reunion_commune)
+depenses_centre_val <- calcul_depenses(depenses_centre_val_commune)
+depenses_france <- calcul_depenses(depenses_france_commune)
+
+depenses_df <- data.frame(
+  Région = c("Guadeloupe", "Réunion", "Centre-Val-de-Loire", "France(total)"),
+  Depenses_100k = c(depenses_guadeloupe, depenses_reunion, depenses_centre_val, depenses_france)
+)
+```
+
+Graphique 
+```{r}
+depenses_df <- depenses_df %>%
+  mutate(couleur = ifelse(Région == "France(total)", "France", "Autres"))
+
+p <- ggplot(depenses_df, aes(x = Depenses_100k, y = Région)) +
+  geom_bar(stat = "identity", fill = ifelse(depenses_df$Région == "France(total)", "#F28C28", "#5ba3f8")) +
+  labs(
+    #title = "Dépenses documentaires et d’action culturelle des bibliothèques rapportées au nombre d’habitants",
+    x = "Dépenses (€/habitants)",
+    y = ""
+  ) +
+  theme_classic() +
+  theme(axis.text.y  = element_text(size = 14),
+        axis.title.x = element_text(size = 16))
+
+p 
+ggsave("../outputs/figures/depenses_bibliotheques.png", plot = p, width = 8, height = 5, dpi = 300)
+```
+
+
+# Nombre d’entrées en bibliothèque par habitant (par mois) 
+
+## Dataset avec les entrées totales par commune par région
+```{r}
+creer_intermediaire <- function(df, colonne_entrees) {
+  df %>%
+    group_by(Ville) %>%
+    summarize(
+      total_entrees_commune = sum(.data[[colonne_entrees]], na.rm = TRUE),
+      Population.commune = suppressWarnings(first(Population.commune[!is.na(Population.commune)]))
+    ) %>%
+    ungroup() %>%
+    mutate(
+      Population.commune = ifelse(
+        is.na(Population.commune),
+        mean(Population.commune, na.rm = TRUE),
+        Population.commune
+      )
+    )
+}
+
+depenses_guadeloupe_commune <- creer_intermediaire(bibli_pub_guadeloupe, "nombre_d_entrees")
+depenses_reunion_commune <- creer_intermediaire(bibli_pub_reunion, "nombre_d_entrees")
+depenses_centre_val_commune <- creer_intermediaire(bibli_pub_cvl, "nombre_d_entrees")
+depenses_france_commune <- creer_intermediaire(bibliotheques_publiques, "nombre_d_entrees")
+```
+
+## Calcul des entrées par habitant
+```{r}
+calcul_entrees_par_habitant <- function(df_commune) {
+  total_entrees <- sum(df_commune$total_entrees_commune, na.rm = TRUE)
+  total_population <- sum(df_commune$Population.commune, na.rm = TRUE)
+  total_entrees / total_population
+}
+
+entrees_guadeloupe <- calcul_entrees_par_habitant(depenses_guadeloupe_commune)
+entrees_reunion <- calcul_entrees_par_habitant(depenses_reunion_commune)
+entrees_centre_val <- calcul_entrees_par_habitant(depenses_centre_val_commune)
+entrees_france <- calcul_entrees_par_habitant(depenses_france_commune)
+
+entrees_df <- data.frame(
+  Région = c("Guadeloupe", "Réunion", "Centre-Val-de-Loire", "France(total)"),
+  Entrees_par_habitant = c(entrees_guadeloupe, entrees_reunion, entrees_centre_val, entrees_france)
+)
+```
+
+## Graphique
+```{r}
+p <- ggplot(entrees_df, aes(x = Entrees_par_habitant, y = Région)) +
+  geom_bar(stat = "identity",
+           fill = ifelse(entrees_df$Région == "France(total)", "#F28C28", "#5ba3f8")) +
+  labs(
+    #title = "Nombre d’entrées en bibliothèque par habitant (par mois)",
+    x = "Entrées par habitant",
+    y = ""
+  ) +
+  theme_classic() +
+  theme(axis.text.y  = element_text(size = 14),
+        axis.title.x = element_text(size = 16))
+
+p
+
+ggsave("../outputs/figures/entrees_bibliotheques.png", plot = p, width = 8, height = 5, dpi = 300)
+```
+
+
+
+
+
+
+
