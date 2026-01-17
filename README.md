@@ -1,6 +1,6 @@
 # Projet data et territoires 2025
 
-<img width="2000" height="1124" alt="Poster" src="https://github.com/user-attachments/assets/9306e9c0-f844-4239-87a1-d67c8aa33090" />
+<img width="2000" height="1124" alt="Poster" src="https://github.com/user-attachments/assets/9306e9c0-f844-4239-87a1-d67c8aa33090"/>
 
 Ce projet, réalisé dans le cadre du Challenge DATA et Territoires, propose une analyse croisée de l'accès à la lecture entre l'Hexagone et les Outre-mer. Notre étude se concentre spécifiquement sur la comparaison entre la région Centre-Val de Loire et les territoires de la Guadeloupe et de La Réunion. Ce choix géographique nous permet de démontrer que les inégalités d'accès aux infrastructures culturelles ne résultent pas seulement de dynamiques économiques, mais découlent également de logiques historiques et postcoloniales influençant encore aujourd'hui l'aménagement du territoire. L'intérêt majeur de ce travail réside dans l'exploitation de données ouvertes pour visualiser concrètement ces fractures territoriales, notamment la concentration littorale des équipements en Outre-mer face à l'enclavement des zones intérieures.
 
@@ -11,9 +11,13 @@ Le déroulement de ce défi s'est articulé autour de trois journées intenses m
 
 Data analyste : - Naïma Beck, 
 
-Graphiste : - Rosana Bidet, Inès Azouaoui, Méline Mazuy
+Graphiste : Rosana Bidet, Inès Azouaoui, Méline Mazuy
 
-Sociologue / Chercheur-Rédacteur : - Dilba Han, Gaspard, Carla Etcheverry, Alexandre Courtas
+Sociologue / Chercheur-Rédacteur : Dilba Han, Gaspard Thomas-Colignon,  Carla Etcheverry, Alexandre Courtas
 
-Chargée de projet : Romane Hoarau, Maé Mairesse
+Chargées de projet : Romane Hoarau, Maé Mairesse
 
+Cy Tech - Sciences-Po Saint-Germain-En-Laye - [2025/2026]
+
+### License
+This project is carried out in an academic setting. The data is provided for educational purposes. It is licensed under CC BY-NC-SA 4.0. License
