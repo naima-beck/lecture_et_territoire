@@ -19,5 +19,8 @@ Chargées de projet : Romane Hoarau, Maé Mairesse
 
 Cy Tech - Sciences-Po Saint-Germain-En-Laye - [2025/2026]
 
-### License
-This project is carried out in an academic setting. The data is provided for educational purposes. It is licensed under CC BY-NC-SA 4.0. License
+## License
+
+This project is carried out in an academic setting. The data is provided for educational purposes.
+It is licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+![License](https://img.shields.io/badge/License-CC%20BY--NC--SA-blue.svg)
